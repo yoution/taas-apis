@@ -17,6 +17,7 @@ const sequelize = new Sequelize(config.get('DATABASE_URL'), {
   logging: false
 })
 
+debugger;
 fs
   .readdirSync(__dirname)
   .filter(file => (file.indexOf('.') !== 0) && (file !== basename) && (file.slice(-3) === '.js'))

@@ -1118,6 +1118,151 @@ async function deleteProjectMember (currentUser, projectId, projectMemberId) {
   }
 }
 
+/**
+ * Create a new challenge.
+ * @param {Object} challenge the challenge to create
+ * @returns {Number} the created challenge id
+ */
+async function createChallenge(challenge) {
+  const apiKey = await getM2Mtoken();
+  const body = _.assign({}, config.NEW_CHALLENGE_TEMPLATE, {
+    typeId: config.TYPE_ID_TASK,
+    name: challenge.name,
+    description: challenge.detailedRequirements,
+    prizeSets: [{
+      type: 'placement',
+      prizes: _.map(challenge.prizes, (prize) => ({type: 'USD', value: prize}))
+    }],
+    timelineTemplateId: config.DEFAULT_TIMELINE_TEMPLATE_ID,
+    projectId: challenge.projectId,
+    trackId: config.DEFAULT_TRACK_ID,
+    legacy:{
+      pureV5Task: true
+    },
+    tags:['Other'],
+    startDate: new Date()
+  });
+  try {
+    const response = await axios.post(`${config.TC_API_URL}/challenges`, body, {
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    const statusCode = response.status ? response.status : null;
+    logger.debug(`EndPoint: POST /challenges,  POST parameters: ${circularJSON.stringify(body)},
+    Status Code:${statusCode}, Response: ${circularJSON.stringify(response.data)}`);
+    return _.get(response, 'data.id');
+  } catch (err) {
+    logger.debug(`EndPoint: POST /challenges,  POST parameters: ${circularJSON.stringify(body)}, Status Code:null,
+    Error: 'Failed to create challenge.', Details: ${circularJSON.stringify(err)}`);
+    throw errors.convertTopcoderApiError(err, 'Failed to create challenge.');
+  }
+}
+
+/**
+ * Update a challenge.
+ * @param {String} id the challenge id
+ * @param {Object} challenge the challenge to update
+ */
+async function updateChallenge(id, challenge) {
+  const apiKey = await getM2Mtoken();
+  logger.debug(`Updating challenge ${id} with ${circularJSON.stringify(challenge)}`);
+  try {
+    const response = await axios.patch(`${config.TC_API_URL}/challenges/${id}`, challenge, {
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    const statusCode = response.status ? response.status : null;
+    logger.debug(`EndPoint: PATCH /challenges/${id},  PATCH parameters: ${circularJSON.stringify(challenge)},
+    Status Code:${statusCode}, Response: ${circularJSON.stringify(response.data)}`);
+  } catch (err) {
+    logger.error('updateChallenge ERROR.');
+    logger.error(`EndPoint: PATCH /challenges/${id}`);
+    logger.error(`${err.message}`);
+    logger.error(`Request: ${JSON.stringify(err.config)}`);
+    logger.error(`Response Data: ${JSON.stringify(err.response.data)}`);
+
+    loggerFile.info(`EndPoint: PATCH /challenges/${id},  PATCH parameters: null, Status Code:null,
+    Error: 'Failed to update challenge.', Details: ${circularJSON.stringify(err)}`);
+    throw errors.convertTopcoderApiError(err, 'Failed to update challenge.');
+  }
+}
+
+/**
+ * activates the topcoder challenge
+ * @param {String} id the challenge id
+ */
+async function activateChallenge(id) {
+  const apiKey = await getM2Mtoken();
+  logger.debug(`Activating challenge ${id}`);
+  try {
+    const response = await axios.patch(`${config.TC_API_URL}/challenges/${id}`, {status: constants.CHALLENGE_STATUS.ACTIVE}, {
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    const statusCode = response.status ? response.status : null;
+    loggerFile.info(`EndPoint: PATCH /challenges/${id},
+    PATCH parameters: { status: '${constants.CHALLENGE_STATUS.ACTIVE}' }, Status Code:${statusCode}, Response: ${circularJSON.stringify(response.data)}`);
+    logger.debug(`Challenge ${id} is activated successfully.`);
+  } catch (err) {
+    logger.error('activateChallenge ERROR.');
+    logger.error(`EndPoint: PATCH /challenges/${id}`);
+    logger.error(`${err.message}`);
+    logger.error(`Request: ${JSON.stringify(err.config)}`);
+    logger.error(`Response Data: ${JSON.stringify(err.response.data)}`);
+
+    loggerFile.info(`EndPoint: PATCH /challenges/${id},  PATCH parameters: { status: '${constants.CHALLENGE_STATUS.ACTIVE}' }, Status Code:null,
+    Error: 'Failed to activate challenge.', Details: ${circularJSON.stringify(err)}`);
+    throw errors.convertTopcoderApiError(err, 'Failed to activate challenge.');
+  }
+}
+
+/**
+ * closes the topcoder challenge
+ * @param {String} id the challenge id
+ * @param {Number} winnerId the winner id
+ * @param {String} winnerUsername the winner handle
+ */
+async function closeChallenge(id, winnerId, winnerUsername) {
+  const apiKey = await getM2Mtoken();
+  logger.debug(`Closing challenge ${id}`);
+  try {
+    const response = await axios.patch(`${config.TC_API_URL}/challenges/${id}`, {
+      status: constants.CHALLENGE_STATUS.COMPLETED,
+      winners: [{
+        userId: winnerId,
+        handle: winnerUsername,
+        placement: 1
+      }]
+    }, {
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    const statusCode = response.status ? response.status : null;
+    logger.debug(`EndPoint: PATCH /challenges/${id},
+    PATCH parameters: { status: '${constants.CHALLENGE_STATUS.COMPLETED}' }, Status Code:${statusCode}, Response: ${circularJSON.stringify(response.data)}`);
+    logger.debug(`Challenge ${id} is closed successfully.`);
+  } catch (err) {
+    logger.error('Closing challenge ERROR.');
+    logger.error(`EndPoint: PATCH /challenges/${id}`);
+    logger.error(`${err.message}`);
+    logger.error(`Request: ${JSON.stringify(err.config)}`);
+    logger.error(`Response Data: ${JSON.stringify(err.response.data)}`);
+
+    logger.error(`EndPoint: PATCH /challenges/${id},  PATCH parameters: { status: '${constants.CHALLENGE_STATUS.COMPLETED}' }, Status Code:null,
+    Error: 'Failed to close challenge.', Details: ${circularJSON.stringify(err)}`);
+    throw errors.convertTopcoderApiError(err, 'Failed to close challenge.');
+  }
+}
+
+
 module.exports = {
   getParamFromCliArgs,
   promptUser,
@@ -1156,6 +1301,10 @@ module.exports = {
   checkIsMemberOfProject,
   getMemberDetailsByHandles,
   getMemberDetailsByEmails,
+  createChallenge,
+  updateChallenge,
+  activateChallenge,
+  closeChallenge,
   createProjectMember,
   listProjectMembers,
   listProjectMemberInvites,
