@@ -835,6 +835,68 @@ getRoleBySkills.schema = Joi.object()
   }).required()
 
 /**
+ * Return skills by job description from EMSI.
+ *
+ * @param {Object} currentUser the user who perform this operation.
+ * @param {Object} data the search criteria
+ * @returns {Object} the result
+ */
+async function getSkillsByJobDescriptionFromEMSI (data) {
+  // load topcoder skills if needed. Using cached skills helps to avoid
+  // unnecessary api calls which is extremely time comsuming.
+  await _reloadCachedTopcoderSkills()
+  // replace markdown tags with spaces
+  const description = helper.removeTextFormatting(data.description)
+  // get skill from emsi
+  const emsiTags = await helper.getTags(description)
+  // extract words from description
+  let words = _.split(description, ' ')
+  // remove stopwords from description
+  words = _.filter(words, word => stopWords.indexOf(word.toLowerCase()) === -1)
+  // include consecutive two word combinations
+  const twoWords = []
+  for (let i = 0; i < words.length - 1; i++) {
+    twoWords.push(`${words[i]} ${words[i + 1]}`)
+  }
+  words = _.concat(words, twoWords)
+  let foundSkills = []
+  const result = []
+  // try to match each word with skill names
+  // using pre-compiled regex pattern
+  _.each(words, word => {
+    _.each(topcoderSkills.skills, skill => {
+      // do not stop searching after a match in order to detect more lookalikes
+      if (skill.pattern.test(word)) {
+        foundSkills.push(skill.name)
+      }
+      // for suffix with 'js'
+      if (!word.endsWith('js') && skill.name.endsWith('js')) {
+        if (skill.pattern.test(word + 'js')) {
+          foundSkills.push(skill.name)
+        }
+      }
+    })
+  })
+  foundSkills = _.uniq(foundSkills)
+  // apply desired template
+  _.each(foundSkills, skill => {
+    result.push({
+      tag: skill,
+      type: 'taas_skill',
+      source: 'taas-jd-parser'
+    })
+  })
+
+  return result
+}
+
+getSkillsByJobDescription.schema = Joi.object()
+  .keys({
+    data: Joi.object().keys({
+      description: Joi.string().required()
+    }).required()
+  }).required()
+/**
  * Return skills by job description.
  *
  * @param {Object} currentUser the user who perform this operation.
@@ -1173,6 +1235,7 @@ module.exports = {
   roleSearchRequest,
   getRoleBySkills,
   getSkillsByJobDescription,
+  getSkillsByJobDescriptionFromEMSI,
   getSkillNamesByIds,
   getSkillIdsByNames,
   createRoleSearchRequest,

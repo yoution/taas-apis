@@ -37,7 +37,7 @@ module.exports = {
   '/taas-teams/getSkillsByJobDescription': {
     post: {
       controller: 'TeamController',
-      method: 'getSkillsByJobDescriptionFromEMSI'
+      method: 'getSkillsByJobDescription'
     }
   },
   '/taas-teams/:id': {
