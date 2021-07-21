@@ -1245,6 +1245,7 @@ async function getTopcoderSkills (criteria) {
  */
 async function getAllTopcoderSkills (criteria) {
   const skills = await getTopcoderSkills(_.assign(criteria, { page: 1, perPage: 100 }))
+  return skills.result
   while (skills.page * skills.perPage <= skills.total) {
     const newSkills = await getTopcoderSkills(_.assign(criteria, { page: skills.page + 1, perPage: 100 }))
     skills.result = [...skills.result, ...newSkills.result]
